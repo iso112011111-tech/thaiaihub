@@ -1,6 +1,6 @@
 "use client";
 
-import { collection, doc, getDoc, serverTimestamp, writeBatch } from "firebase/firestore";
+import { collection, doc, getDoc, increment, serverTimestamp, writeBatch } from "firebase/firestore";
 import type { User } from "firebase/auth";
 import { db } from "./client";
 import { COLLECTIONS } from "./collections";
@@ -136,8 +136,12 @@ export async function createPrompt(user: User, input: NewPrompt) {
     });
   });
 
-  // Prompt counts per author are derived on the server from the prompts
-  // themselves, so there is no counter to bump on the profile.
+  // Atomically increment the author's prompt count in the same commit.
+  // firestore.rules validates this increment and enforces the 50 prompt quota per account.
+  batch.update(doc(db, COLLECTIONS.users, user.uid), {
+    promptCount: increment(1),
+  });
+
   await batch.commit();
 
   return { id: promptRef.id, slug };

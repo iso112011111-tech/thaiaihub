@@ -15,7 +15,12 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
  * nothing about the key it was made with.
  */
 function signingKey(): Buffer {
-  const secret = process.env.CHAT_SIGNING_SECRET || process.env.AI_API_KEY || "";
+  const secret =
+    process.env.CHAT_SIGNING_SECRET ||
+    process.env.AI_API_KEY ||
+    process.env.GEMINI_API_KEY ||
+    process.env.FIREBASE_PROJECT_ID ||
+    "thai-ai-hub-sig-salt";
   return createHash("sha256").update(`thai-ai-hub:chat-history:${secret}`).digest();
 }
 

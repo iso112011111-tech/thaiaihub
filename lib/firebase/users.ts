@@ -78,6 +78,7 @@ async function writeProfile(
     handle,
     name: (extra.name ?? user.displayName ?? "").trim().slice(0, 60) || handle,
     photoURL: user.photoURL ?? null,
+    promptCount: 0,
     createdAt: serverTimestamp(),
     lastSeenAt: serverTimestamp(),
   });

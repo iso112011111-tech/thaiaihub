@@ -16,6 +16,16 @@ import { clientIp, createRateLimiter } from "@/lib/rate-limit";
  */
 const perPrompt = createRateLimiter({ limit: 1, windowMs: 6 * 60 * 60 * 1000 });
 const perAddress = createRateLimiter({ limit: 30, windowMs: 60_000 });
+const withoutCookieBurst = createRateLimiter({ limit: 10, windowMs: 60_000 });
+
+function getViewerId(request: Request): { viewerId: string; isNew: boolean } {
+  const cookieHeader = request.headers.get("cookie") ?? "";
+  const match = cookieHeader.match(/(?:^|;\s*)view_token=([^;]+)/);
+  if (match && match[1]) {
+    return { viewerId: match[1], isNew: false };
+  }
+  return { viewerId: crypto.randomUUID(), isNew: true };
+}
 
 export async function POST(
   request: Request,
@@ -26,9 +36,20 @@ export async function POST(
 
   const { id } = await params;
   const ip = clientIp(request);
-  if (perAddress(ip) || perPrompt(`${ip}:${id}`)) {
-    // Not an error for a reader who came back; the view just is not counted again.
-    return NextResponse.json({ ok: true, counted: false });
+  const { viewerId, isNew } = getViewerId(request);
+
+  // Checks address burst limit, cookie-less burst limit, and persistent cookie viewer limit
+  if (perAddress(ip) || (isNew && withoutCookieBurst(ip)) || perPrompt(`${viewerId}:${id}`)) {
+    const response = NextResponse.json({ ok: true, counted: false });
+    if (isNew) {
+      response.cookies.set("view_token", viewerId, {
+        httpOnly: true,
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24 * 30, // 30 days
+        path: "/",
+      });
+    }
+    return response;
   }
 
   try {
@@ -36,7 +57,17 @@ export async function POST(
       .collection(COLLECTIONS.prompts)
       .doc(id)
       .update({ views: FieldValue.increment(1) });
-    return NextResponse.json({ ok: true, counted: true });
+
+    const response = NextResponse.json({ ok: true, counted: true });
+    if (isNew) {
+      response.cookies.set("view_token", viewerId, {
+        httpOnly: true,
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24 * 30,
+        path: "/",
+      });
+    }
+    return response;
   } catch {
     // A missing document (seed fallback data) should not surface as an error.
     return NextResponse.json({ ok: false });

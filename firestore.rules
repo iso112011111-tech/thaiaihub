@@ -76,7 +76,10 @@ service cloud.firestore {
         && request.resource.data.rating == 0
         && request.resource.data.ratingCount == 0
         && request.resource.data.status == 'published'
-        && request.resource.data.createdAt == request.time;
+        && request.resource.data.createdAt == request.time
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('promptCount', 0) < 50
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.promptCount ==
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('promptCount', 0) + 1;
 
       // Edits and deletes go through /api/prompts/[id] (Admin SDK), which
       // validates input and cleans up subcollections. A direct client write
@@ -114,25 +117,27 @@ service cloud.firestore {
       allow read: if isOwner(uid);
 
       allow create: if isOwner(uid)
-        && request.resource.data.keys().hasOnly(['uid', 'handle', 'name', 'photoURL', 'createdAt', 'lastSeenAt'])
+        && request.resource.data.keys().hasOnly(['uid', 'handle', 'name', 'photoURL', 'createdAt', 'lastSeenAt', 'promptCount'])
         && request.resource.data.uid == uid
         && request.resource.data.handle is string
         && request.resource.data.handle.matches('[a-z0-9_]{3,30}')
         && validName(request.resource.data.name)
         && (request.resource.data.get('photoURL', null) == null || isAvatar(request.resource.data.photoURL))
+        && request.resource.data.get('promptCount', 0) == 0
         // The username must be reserved for this account in the same batch.
         && getAfter(/databases/$(database)/documents/handles/$(request.resource.data.handle)).data.uid == uid;
 
       // Name, avatar and last-seen only. The handle is fixed after sign-up, and
-      // counters such as promptCount are derived on the server from real prompts
-      // so nobody can edit their way up the leaderboard.
+      // promptCount may only increment by +1 when creating a prompt in an atomic batch.
       allow update: if isOwner(uid)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'photoURL', 'lastSeenAt'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'photoURL', 'lastSeenAt', 'promptCount'])
         && (!('name' in request.resource.data.diff(resource.data).affectedKeys())
             || validName(request.resource.data.name))
         && (!('photoURL' in request.resource.data.diff(resource.data).affectedKeys())
             || request.resource.data.photoURL == null
-            || isAvatar(request.resource.data.photoURL));
+            || isAvatar(request.resource.data.photoURL))
+        && (!('promptCount' in request.resource.data.diff(resource.data).affectedKeys())
+            || request.resource.data.promptCount == resource.data.get('promptCount', 0) + 1);
 
       allow delete: if false;
     }

@@ -181,11 +181,18 @@ async function fetchEveryPrompt(db: FirebaseFirestore.Firestore): Promise<Prompt
  */
 export async function getAllPrompts(): Promise<Prompt[]> {
   const db = adminDb();
-  if (!db) return seedPrompts;
+  const allowSeed = process.env.ALLOW_SEED_FALLBACK !== "false";
+
+  if (!db) {
+    if (!allowSeed) throw new Error("Firebase Admin DB not initialized and seed fallback is disabled");
+    return seedPrompts;
+  }
 
   try {
     const count = (await db.collection(COLLECTIONS.prompts).count().get()).data().count;
-    if (count === 0) return seedPrompts;
+    if (count === 0) {
+      return allowSeed ? seedPrompts : [];
+    }
 
     const cached = store.__promptsCache;
     if (cached && cached.count === count && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
@@ -196,7 +203,8 @@ export async function getAllPrompts(): Promise<Prompt[]> {
     store.__promptsCache = { prompts, count, fetchedAt: Date.now() };
     return prompts;
   } catch (error) {
-    console.error("[firestore] อ่าน prompts ไม่สำเร็จ ใช้ข้อมูลตัวอย่างแทน", error);
+    console.error("[firestore] อ่าน prompts ไม่สำเร็จ", error);
+    if (!allowSeed) throw error;
     return store.__promptsCache?.prompts ?? seedPrompts;
   }
 }

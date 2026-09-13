@@ -120,6 +120,30 @@ function pickForContext(prompts: Prompt[], conversation: string) {
   return { detailed, indexed };
 }
 
+const INJECTION_PATTERNS = [
+  /ignore\s+(all\s+)?(previous|prior|above)\s+(instructions|prompts|rules)/i,
+  /disregard\s+(all\s+)?(previous|prior|above)/i,
+  /system\s+override/i,
+  /you\s+are\s+now\s+(a|an)?/i,
+  /ลืมคำสั่ง/i,
+  /คำสั่งก่อนหน้า/i,
+  /จงเป็น/i,
+  /system_rules/i,
+  /role:\s*["']?system/i,
+];
+
+function sanitizeUntrusted(text: string): string {
+  // Normalize unicode and strip zero-width and invisible characters used to bypass filters
+  let clean = asData(text)
+    .normalize("NFKC")
+    .replace(/[\u200B-\u200D\uFEFF\u00AD\u2060]/g, "");
+
+  for (const pattern of INJECTION_PATTERNS) {
+    clean = clean.replace(pattern, "[คัดกรอง]");
+  }
+  return clean;
+}
+
 async function buildSiteContext(
   detailed: Prompt[],
   indexed: Prompt[],
@@ -129,22 +153,18 @@ async function buildSiteContext(
 
   const indexLines = indexed.map(
     (prompt) =>
-      `- ${prompt.slug} | ${asData(prompt.title)} | ${categoryLabel(prompt.category)} | ${asData(prompt.tags.join(", "))}`,
+      `- ${prompt.slug} | ${sanitizeUntrusted(prompt.title)} | ${categoryLabel(prompt.category)} | ${sanitizeUntrusted(prompt.tags.join(", "))}`,
   );
 
   const promptLines = detailed.map((prompt) => {
-    const body =
-      prompt.body.length > BODY_PREVIEW ? `${prompt.body.slice(0, BODY_PREVIEW)}…` : prompt.body;
     return [
       `<prompt slug="${prompt.slug}">`,
-      `ชื่อ: ${asData(prompt.title)}`,
+      `ชื่อ: ${sanitizeUntrusted(prompt.title)}`,
       `หมวด: ${categoryLabel(prompt.category)}`,
-      `แท็ก: ${asData(prompt.tags.join(", ")) || "-"}`,
-      `คำอธิบาย: ${asData(prompt.excerpt)}`,
-      `ผู้เขียน: ${asData(prompt.author.name)}`,
+      `แท็ก: ${sanitizeUntrusted(prompt.tags.join(", ")) || "-"}`,
+      `คำอธิบาย: ${sanitizeUntrusted(prompt.excerpt)}`,
+      `ผู้เขียน: ${sanitizeUntrusted(prompt.author.name)}`,
       `สถิติ: โหวต ${prompt.upvotes}, เข้าชม ${prompt.views}, คะแนน ${prompt.rating.toFixed(1)}/5 จาก ${prompt.ratingCount} คน, ลงเมื่อ ${prompt.createdAt || "-"}`,
-      `เนื้อหา prompt:`,
-      asData(body),
       `</prompt>`,
     ].join("\n");
   });

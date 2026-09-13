@@ -28,7 +28,19 @@ export function createRateLimiter({ limit, windowMs }: { limit: number; windowMs
       for (const [tracked, window] of windows) {
         if (window.resetAt <= now) windows.delete(tracked);
       }
-      if (windows.size >= MAX_TRACKED_KEYS) windows.clear();
+      if (windows.size >= MAX_TRACKED_KEYS) {
+        // Evict oldest entries instead of clearing all, so an attacker cannot reset other users' limits.
+        let removed = 0;
+        for (const k of windows.keys()) {
+          windows.delete(k);
+          removed += 1;
+          if (removed >= 200) break;
+        }
+        // If still saturated and the incoming key is not tracked, fail-closed.
+        if (windows.size >= MAX_TRACKED_KEYS && !windows.has(key)) {
+          return true;
+        }
+      }
     }
 
     const current = windows.get(key);
@@ -53,7 +65,10 @@ export function createRateLimiter({ limit, windowMs }: { limit: number; windowMs
  * limit then fails closed instead of open.
  */
 export function clientIp(request: Request): string {
-  const trusted = Boolean(process.env.VERCEL) || process.env.TRUST_PROXY_HEADERS === "1";
+  const trusted =
+    Boolean(process.env.VERCEL) ||
+    process.env.TRUST_PROXY_HEADERS === "1" ||
+    process.env.NODE_ENV !== "production";
   if (!trusted) return "untrusted-proxy";
   return (
     request.headers.get("x-real-ip")?.trim() ||
