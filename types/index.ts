@@ -45,14 +45,6 @@ export interface Prompt {
   createdAt: string;
 }
 
-export interface TrendingItem {
-  id: string;
-  slug: string;
-  rank: number;
-  title: string;
-  views: number;
-}
-
 export interface AiTool {
   id: string;
   name: string;

@@ -32,9 +32,10 @@ export function CoverArt({
           alt={label}
           fill
           sizes="(max-width: 1024px) 50vw, 300px"
-          // Data URIs are already sized and encoded by the uploader; the
-          // optimiser cannot process them and would throw.
-          unoptimized={image.startsWith("data:")}
+          // Covers are already sized and encoded by the uploader, whether inline
+          // (data URI) or served by /api/prompts/[id]/cover; re-optimising them
+          // would only cost server time.
+          unoptimized={image.startsWith("data:") || image.startsWith("/api/")}
           className="object-cover transition-transform duration-500 group-hover:scale-[1.04]"
         />
       </div>

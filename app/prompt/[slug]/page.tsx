@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Users } from "lucide-react";
 import { CopyButton } from "@/components/prompt/CopyButton";
@@ -65,9 +66,16 @@ export default async function PromptDetailPage({
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <Avatar name={prompt.author.name} src={prompt.author.avatarUrl} />
-          <span className="text-[13px] font-medium text-ink-soft">
-            {prompt.author.name}
-          </span>
+          {prompt.author.handle ? (
+            <Link
+              href={`/u/${prompt.author.handle}`}
+              className="text-[13px] font-medium text-ink-soft transition-colors hover:text-accent-hover"
+            >
+              {prompt.author.name}
+            </Link>
+          ) : (
+            <span className="text-[13px] font-medium text-ink-soft">{prompt.author.name}</span>
+          )}
           <span className="inline-flex items-center gap-1 text-xs text-ink-muted">
             <Users className="size-3.5" />
             {formatCount(prompt.views)} คนอ่าน

@@ -66,9 +66,14 @@ async function withLiveAuthors(prompts: Prompt[]): Promise<Prompt[]> {
   if (ids.length === 0) return prompts;
 
   try {
-    const snapshots = await db.getAll(
-      ...ids.map((id) => db.collection(COLLECTIONS.users).doc(id)),
-    );
+    // Read in chunks: one getAll call over thousands of references is too large a request.
+    const snapshots: FirebaseFirestore.DocumentSnapshot[] = [];
+    for (let start = 0; start < ids.length; start += AUTHOR_BATCH) {
+      const refs = ids
+        .slice(start, start + AUTHOR_BATCH)
+        .map((id) => db.collection(COLLECTIONS.users).doc(id));
+      snapshots.push(...(await db.getAll(...refs)));
+    }
 
     const live = new Map<string, { name?: string; handle?: string; photoURL?: string }>();
     for (const snapshot of snapshots) {
@@ -92,6 +97,31 @@ async function withLiveAuthors(prompts: Prompt[]): Promise<Prompt[]> {
     console.error("[firestore] ดึงโปรไฟล์ผู้เขียนไม่สำเร็จ ใช้ข้อมูลที่ฝังไว้แทน", error);
     return prompts;
   }
+}
+
+/** Profiles read per getAll call when hydrating authors. */
+const AUTHOR_BATCH = 300;
+
+/**
+ * Fields read for the cached list. The cover (up to ~120 KB of base64 each) and
+ * the author's stored avatar are left out: the list lives in server memory and
+ * feeds every page, so covers are linked through /api/prompts/[id]/cover and
+ * avatars come from the live profile instead.
+ */
+const LIST_FIELDS = [
+  "slug", "title", "excerpt", "body", "category", "tags",
+  "author.id", "author.name", "author.handle",
+  "upvotes", "views", "rating", "ratingCount",
+  "createdAt", "updatedAt", "imageCount", "status",
+];
+
+/** URL of a prompt's cover, versioned by its last change so caches refresh after an edit. */
+function coverLink(id: string, data: FirebaseFirestore.DocumentData): string | undefined {
+  // Every write path sets imageCount together with the cover; zero means no cover.
+  if (!(Number(data.imageCount) > 0)) return undefined;
+  const changed = data.updatedAt ?? data.createdAt;
+  const version = typeof changed?.toMillis === "function" ? changed.toMillis() : 0;
+  return `/api/prompts/${encodeURIComponent(id)}/cover?v=${version}`;
 }
 
 /** Firestore reads per round trip while walking the whole collection. */
@@ -120,13 +150,18 @@ async function fetchEveryPrompt(db: FirebaseFirestore.Firestore): Promise<Prompt
   let cursor: FirebaseFirestore.QueryDocumentSnapshot | undefined;
 
   for (;;) {
-    let query = db.collection(COLLECTIONS.prompts).orderBy("createdAt", "desc").limit(BATCH_SIZE);
+    let query = db
+      .collection(COLLECTIONS.prompts)
+      .select(...LIST_FIELDS)
+      .orderBy("createdAt", "desc")
+      .limit(BATCH_SIZE);
     if (cursor) query = query.startAfter(cursor);
     const snapshot = await query.get();
     // Hidden prompts are filtered here rather than in the query: a `status !=`
     // filter would force ordering by status and need a composite index.
     for (const doc of snapshot.docs) {
-      if (!isHidden(doc.data())) prompts.push(toPrompt(doc.id, doc.data()));
+      const data = doc.data();
+      if (!isHidden(data)) prompts.push({ ...toPrompt(doc.id, data), coverUrl: coverLink(doc.id, data) });
     }
     if (snapshot.size < BATCH_SIZE) break;
     cursor = snapshot.docs[snapshot.docs.length - 1];
