@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { EmailVerificationBanner } from "@/components/auth/EmailVerificationBanner";
 import { AiLauncher } from "./AiLauncher";
 import { Footer } from "./Footer";
 import { Sidebar } from "./Sidebar";
@@ -15,7 +16,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       <Topbar />
       <div className="mx-auto grid max-w-[1440px] gap-6 px-4 sm:px-6 lg:grid-cols-[236px_minmax(0,1fr)]">
         <Sidebar />
-        <main className="min-w-0 py-6">{children}</main>
+        <main className="min-w-0 py-6">
+          <EmailVerificationBanner />
+          {children}
+        </main>
       </div>
       <div className="mx-auto max-w-[1440px] px-4 sm:px-6">
         <Footer />

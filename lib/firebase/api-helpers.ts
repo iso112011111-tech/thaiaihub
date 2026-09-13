@@ -38,6 +38,32 @@ export async function requireUser(request: Request) {
   return { uid: verified.token!.uid };
 }
 
+/** The caller's verified ID token, or null when absent or invalid — for endpoints that also serve visitors. */
+export async function getCallerToken(request: Request): Promise<DecodedIdToken | null> {
+  const verified = await verifyCaller(request);
+  return verified.token ?? null;
+}
+
+/**
+ * Like requireUser, but the account's email must be verified. Used where fake
+ * accounts would skew what everyone sees — votes, ratings and reports. An
+ * email-and-password account costs nothing to create with a made-up address;
+ * Google accounts arrive verified.
+ */
+export async function requireVerifiedUser(request: Request) {
+  const verified = await verifyCaller(request);
+  if (verified.error) return { error: verified.error };
+  if (!verified.token!.email_verified) {
+    return {
+      error: NextResponse.json(
+        { error: "กรุณายืนยันอีเมลก่อน แล้วลองอีกครั้ง", code: "email-unverified" },
+        { status: 403 },
+      ),
+    };
+  }
+  return { uid: verified.token!.uid };
+}
+
 /**
  * Admins are listed by email in ADMIN_EMAILS (comma-separated, server-only).
  * The token's email must be verified: otherwise anyone could register an

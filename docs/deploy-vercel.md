@@ -12,6 +12,8 @@
 | `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` | Admin SDK — Vercel ไม่มีไฟล์ `secrets/` ให้คัดลอกค่าจากไฟล์ service account มาใส่แทน `FIREBASE_SERVICE_ACCOUNT_PATH` |
 | `AI_BASE_URL`, `AI_API_KEY` | AI THAI BOT ผ่านบริการ maxplus-ai (โมเดล `gemini-2.5-flash` กำหนดไว้ในโค้ด) |
 | `ADMIN_EMAILS` | อีเมลผู้ดูแลที่เข้าหน้า `/admin` ได้ คั่นด้วยจุลภาค ต้องเป็นอีเมลที่ยืนยันแล้ว |
+| `AI_DAILY_LIMIT`, `AI_USER_DAILY_LIMIT` | (ไม่บังคับ) เพดานการเรียก AI ต่อวัน ทั้งเว็บ / ต่อผู้ใช้ ค่าเริ่มต้น 500 / 30 นับรวมทุกเซิร์ฟเวอร์ |
+| `CHAT_SIGNING_SECRET` | (ไม่บังคับ) กุญแจเซ็นข้อความบอท ถ้าไม่ใส่จะคำนวณจาก `AI_API_KEY` |
 
 ค่าที่ขึ้นต้นด้วย `NEXT_PUBLIC_` จะถูกส่งไปเบราว์เซอร์ ห้ามใส่ความลับในชื่อแบบนี้
 
@@ -31,9 +33,11 @@ npm run backfill:handles
 
 ถ้าไม่รัน สมาชิกใหม่อาจสมัครด้วยชื่อผู้ใช้ที่สมาชิกเก่าใช้อยู่แล้วได้
 
-## 4. โดเมนสำหรับล็อกอิน
+## 4. โดเมนสำหรับล็อกอิน และอีเมลยืนยัน
 
 Firebase Console → Authentication → Settings → Authorized domains → เพิ่มโดเมนของ Vercel (เช่น `your-app.vercel.app` และโดเมนจริง)
+
+สมาชิกที่สมัครด้วยอีเมลต้องยืนยันอีเมลก่อนจึงจะโหวต ให้คะแนน และรายงานได้ ปรับข้อความอีเมลยืนยันเป็นภาษาไทยได้ที่ Authentication → Templates → Email address verification
 
 ## 5. กันยิงคำขอถี่ๆ (Vercel Firewall)
 

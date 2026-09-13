@@ -42,11 +42,19 @@ export function createRateLimiter({ limit, windowMs }: { limit: number; windowMs
 }
 
 /**
- * Best-effort client address. Hosting platforms and reverse proxies overwrite
- * these headers; on a bare `next start` they come from the client and can be
- * forged, which is why callers pair a per-address limit with a global one.
+ * The client address, only when it can be trusted.
+ *
+ * `x-real-ip` and `x-forwarded-for` are only as honest as whatever sits in
+ * front of the app. Vercel sets them itself and discards values sent by the
+ * client; a bare `next start` passes the client's own headers through, so anyone
+ * could claim a new address on every request and walk past per-address limits.
+ * Off Vercel the headers are ignored unless TRUST_PROXY_HEADERS=1 declares a
+ * reverse proxy that overwrites them, and every caller shares one bucket — the
+ * limit then fails closed instead of open.
  */
 export function clientIp(request: Request): string {
+  const trusted = Boolean(process.env.VERCEL) || process.env.TRUST_PROXY_HEADERS === "1";
+  if (!trusted) return "untrusted-proxy";
   return (
     request.headers.get("x-real-ip")?.trim() ||
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||

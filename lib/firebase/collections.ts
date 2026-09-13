@@ -7,4 +7,6 @@ export const COLLECTIONS = {
   handles: "handles",
   /** reports/{promptId}_{uid}: one report per reader per prompt, written by the server. */
   reports: "reports",
+  /** aiUsage/{YYYY-MM-DD} and its users/{uid}: daily AI call counters, written by the server. */
+  aiUsage: "aiUsage",
 } as const;

@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { BadgeCheck, ChevronRight, SendHorizontal, X } from "lucide-react";
-import type { ChatHistoryItem, ChatPromptLink, ChatResponse } from "@/app/api/chat/route";
+import type {
+  ChatHistoryItem,
+  ChatNotice,
+  ChatPromptLink,
+  ChatResponse,
+} from "@/app/api/chat/route";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { cn } from "@/lib/utils";
 import { SharkMark } from "./SharkMark";
 
@@ -13,7 +19,15 @@ interface Message {
   text: string;
   prompts?: ChatPromptLink[];
   exploreUrl?: string;
+  notice?: ChatNotice;
+  /** The server's signature, returned with history so this reply is accepted as the bot's. */
+  sig?: string;
 }
+
+const NOTICES: Record<Exclude<ChatNotice, "login">, string> = {
+  "user-limit": "วันนี้คุณใช้ AI ครบโควตาแล้ว คำตอบนี้มาจากการค้นหาแทน",
+  "site-limit": "วันนี้ AI มีผู้ใช้ครบโควตาของเว็บแล้ว คำตอบนี้มาจากการค้นหาแทน",
+};
 
 const BOT_NAME = "AI THAI BOT";
 
@@ -21,6 +35,7 @@ const SUGGESTIONS = ["Prompt ยอดนิยม", "Prompt วาดภาพ"
 
 /** Chat window opened by the floating launcher. Answers come from /api/chat. */
 export function ChatPanel({ onClose }: { onClose: () => void }) {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
@@ -47,16 +62,22 @@ export function ChatPanel({ onClose }: { onClose: () => void }) {
     if (!text || pending) return;
 
     // Earlier turns let the model understand follow-ups like "อันที่สองล่ะ".
-    const history: ChatHistoryItem[] = messages.slice(-10).map(({ from, text }) => ({ from, text }));
+    const history: ChatHistoryItem[] = messages
+      .slice(-10)
+      .map(({ from, text, sig }) => ({ from, text, sig }));
 
     setMessages((current) => [...current, { id: nextId.current++, from: "user", text }]);
     setDraft("");
     setPending(true);
 
     try {
+      // Signed-in members get the AI; the server answers everyone else by keyword search.
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (user) headers.authorization = `Bearer ${await user.getIdToken()}`;
+
       const response = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ message: text, history }),
       });
       // 429 still carries a friendly reply from the server.
@@ -70,6 +91,8 @@ export function ChatPanel({ onClose }: { onClose: () => void }) {
           text: data.reply,
           prompts: data.prompts,
           exploreUrl: data.exploreUrl,
+          notice: data.notice,
+          sig: data.sig,
         },
       ]);
     } catch {
@@ -124,6 +147,14 @@ export function ChatPanel({ onClose }: { onClose: () => void }) {
             สวัสดีครับ! ผม <strong className="font-semibold text-accent-hover">{BOT_NAME}</strong>{" "}
             ถามเรื่อง Prompt ในเว็บไซต์เราได้เลยครับ
           </p>
+          {!user ? (
+            <p className="mt-2 text-xs text-ink-muted">
+              <Link href="/login" onClick={onClose} className="font-medium text-accent-hover hover:underline">
+                เข้าสู่ระบบ
+              </Link>{" "}
+              เพื่อคุยกับ AI แบบเต็ม ตอนนี้ตอบด้วยการค้นหาใน prompt
+            </p>
+          ) : null}
         </BotRow>
 
         {messages.length === 0 && (
@@ -179,6 +210,18 @@ export function ChatPanel({ onClose }: { onClose: () => void }) {
                   ดูผลการค้นหาทั้งหมด →
                 </Link>
               )}
+              {message.notice === "login" ? (
+                <p className="mt-2 border-t border-line pt-2 text-[11px] text-ink-muted">
+                  <Link href="/login" onClick={onClose} className="font-medium text-accent-hover hover:underline">
+                    เข้าสู่ระบบ
+                  </Link>{" "}
+                  เพื่อให้ AI ช่วยตอบแบบละเอียด
+                </p>
+              ) : message.notice ? (
+                <p className="mt-2 border-t border-line pt-2 text-[11px] text-ink-muted">
+                  {NOTICES[message.notice]}
+                </p>
+              ) : null}
             </BotRow>
           ),
         )}

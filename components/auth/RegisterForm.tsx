@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { createUserWithEmailAndPassword, sendEmailVerification, updateProfile } from "firebase/auth";
 import { SocialAuthButtons } from "./SocialAuthButtons";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -41,6 +41,10 @@ export function RegisterForm() {
       // Auth stores the display name; Firestore stores everything else.
       await updateProfile(credential.user, { displayName: name });
       await ensureUserProfile(credential.user, { username, name });
+      // Voting, rating and reporting need a verified email, so send the link now.
+      await sendEmailVerification(credential.user).catch((error) => {
+        console.error("[auth] ส่งอีเมลยืนยันไม่สำเร็จ", error);
+      });
       router.push("/");
       router.refresh();
     } catch (err) {

@@ -24,6 +24,7 @@ export function UpvoteButton({
   const [voted, setVoted] = useState(false);
   const [total, setTotal] = useState(count);
   const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
 
   // Restore this user's previous vote so the button is not lying on load.
   useEffect(() => {
@@ -51,6 +52,13 @@ export function UpvoteButton({
       return;
     }
     if (busy) return;
+    setNotice("");
+
+    // The API refuses unverified accounts; say why instead of flickering the count.
+    if (!user.emailVerified) {
+      setNotice("ยืนยันอีเมลก่อนโหวต");
+      return;
+    }
 
     setBusy(true);
     const previous = { voted, total };
@@ -63,33 +71,41 @@ export function UpvoteButton({
         headers: { authorization: `Bearer ${await user.getIdToken()}` },
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error);
+      if (!response.ok) throw new Error(data.error ?? "โหวตไม่สำเร็จ");
       setVoted(data.voted);
       setTotal(data.upvotes);
-    } catch {
+    } catch (error) {
       setVoted(previous.voted);
       setTotal(previous.total);
+      setNotice(error instanceof Error ? error.message : "โหวตไม่สำเร็จ");
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <button
-      type="button"
-      onClick={toggle}
-      aria-pressed={voted}
-      aria-label={voted ? "ยกเลิกโหวต" : "โหวตให้ prompt นี้"}
-      className={cn(
-        "inline-flex items-center gap-1 rounded-pill border px-2.5 py-1 text-xs font-semibold transition-colors disabled:opacity-60",
-        voted
-          ? "border-accent-ring bg-accent-soft text-accent-hover"
-          : "border-line bg-surface text-ink-muted hover:border-accent-ring hover:text-accent-hover",
-        className,
-      )}
-    >
-      <ArrowBigUp className={cn("size-4", voted && "fill-current")} strokeWidth={2} />
-      {formatCount(total)}
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={toggle}
+        aria-pressed={voted}
+        aria-label={voted ? "ยกเลิกโหวต" : "โหวตให้ prompt นี้"}
+        className={cn(
+          "inline-flex items-center gap-1 rounded-pill border px-2.5 py-1 text-xs font-semibold transition-colors disabled:opacity-60",
+          voted
+            ? "border-accent-ring bg-accent-soft text-accent-hover"
+            : "border-line bg-surface text-ink-muted hover:border-accent-ring hover:text-accent-hover",
+          className,
+        )}
+      >
+        <ArrowBigUp className={cn("size-4", voted && "fill-current")} strokeWidth={2} />
+        {formatCount(total)}
+      </button>
+      {notice ? (
+        <span role="status" className="text-xs text-flame">
+          {notice}
+        </span>
+      ) : null}
+    </>
   );
 }

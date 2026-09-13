@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { COLLECTIONS } from "@/lib/firebase/collections";
-import { requireUser } from "@/lib/firebase/api-helpers";
+import { requireUser, requireVerifiedUser } from "@/lib/firebase/api-helpers";
 
 class PromptNotFound extends Error {}
 
@@ -19,7 +19,8 @@ export async function POST(
   const db = adminDb();
   if (!db) return NextResponse.json({ error: "เซิร์ฟเวอร์ยังไม่พร้อม" }, { status: 500 });
 
-  const { uid, error } = await requireUser(request);
+  // A verified email keeps throwaway accounts from moving the numbers.
+  const { uid, error } = await requireVerifiedUser(request);
   if (error) return error;
 
   let score = Number.NaN;
