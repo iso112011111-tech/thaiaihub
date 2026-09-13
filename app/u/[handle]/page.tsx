@@ -5,6 +5,7 @@ import { FeaturedGrid } from "@/components/home/FeaturedGrid";
 import { Avatar } from "@/components/ui/Avatar";
 import { Card } from "@/components/ui/Card";
 import { Pagination } from "@/components/ui/Pagination";
+import { SITE_NAME, SITE_URL } from "@/lib/constants";
 import { getAuthorByHandle, getPromptsByAuthorId } from "@/data/prompts";
 import { formatCount } from "@/lib/utils";
 
@@ -20,9 +21,31 @@ export async function generateMetadata({
   const author = await getAuthorByHandle(handle);
   if (!author) return { title: "ไม่พบผู้ใช้" };
 
+  const title = `${author.name} (@${author.handle}) — นักสร้าง Prompt`;
+  const description = `รวมผลงาน Prompt AI ที่สร้างและแบ่งปันโดย ${author.name} (@${author.handle}) บน Thai AI Hub`;
+  const url = `${SITE_URL}/u/${encodeURIComponent(author.handle)}`;
+
   return {
-    title: `${author.name} (@${author.handle})`,
-    description: `รวมผลงาน Prompt ที่สร้างและแบ่งปันโดย ${author.name}`,
+    title,
+    description,
+    alternates: {
+      canonical: url,
+    },
+    openGraph: {
+      type: "profile",
+      title,
+      description,
+      url,
+      siteName: SITE_NAME,
+      locale: "th_TH",
+      images: author.avatarUrl ? [{ url: author.avatarUrl }] : undefined,
+    },
+    twitter: {
+      card: "summary",
+      title,
+      description,
+      images: author.avatarUrl ? [author.avatarUrl] : undefined,
+    },
   };
 }
 
@@ -46,8 +69,37 @@ export default async function UserProfilePage({
   const page = Math.min(totalPages, Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1));
   const visible = prompts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ProfilePage",
+    url: `${SITE_URL}/u/${encodeURIComponent(author.handle)}`,
+    name: `${author.name} (@${author.handle})`,
+    mainEntity: {
+      "@type": "Person",
+      name: author.name,
+      alternateName: author.handle,
+      ...(author.avatarUrl ? { image: author.avatarUrl } : {}),
+      interactionStatistic: [
+        {
+          "@type": "InteractionCounter",
+          interactionType: "https://schema.org/WriteAction",
+          userInteractionCount: prompts.length,
+        },
+        {
+          "@type": "InteractionCounter",
+          interactionType: "https://schema.org/LikeAction",
+          userInteractionCount: totalUpvotes,
+        },
+      ],
+    },
+  };
+
   return (
     <div className="space-y-8">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* Profile Header Card */}
       <Card className="p-6 sm:p-8">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">

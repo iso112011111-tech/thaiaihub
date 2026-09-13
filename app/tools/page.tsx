@@ -8,7 +8,20 @@ import { safeImageSrc } from "@/lib/images/safe-src";
 import { initials } from "@/lib/utils";
 import type { AiTool } from "@/types";
 
-export const metadata: Metadata = { title: "เครื่องมือ AI" };
+export const metadata: Metadata = {
+  title: "รวมเครื่องมือ AI ยอดนิยมสำหรับคนไทย — อัปเดตล่าสุด",
+  description:
+    "ไดเรกทอรีรวบรวมเครื่องมือ AI ชั้นนำ ทั้ง ChatGPT, Midjourney, Claude, Suno และเครื่องมือ AI ด้านการทำงาน การตลาด และวาดภาพ",
+  alternates: {
+    canonical: "/tools",
+  },
+  openGraph: {
+    title: "รวมเครื่องมือ AI ยอดนิยมสำหรับคนไทย — Thai AI Hub",
+    description:
+      "ไดเรกทอรีรวบรวมเครื่องมือ AI ชั้นนำ ทั้ง ChatGPT, Midjourney, Claude, Suno และเครื่องมือ AI ด้านการทำงาน การตลาด และวาดภาพ",
+    url: "/tools",
+  },
+};
 
 const PRICING_LABEL: Record<AiTool["pricing"], string> = {
   free: "ฟรี",

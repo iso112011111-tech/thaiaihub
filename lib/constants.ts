@@ -20,6 +20,29 @@ import type { Category, CategoryId } from "@/types";
 
 export const SITE_NAME = "Thai AI Hub";
 export const SITE_TAGLINE = "รวมสุดยอด AI ไว้ที่เดียว";
+export const SITE_DESCRIPTION =
+  "ศูนย์รวม Prompt AI ภาษาไทยคุณภาพสูงสำหรับ ChatGPT, Midjourney, Claude และเครื่องมือ AI ชั้นนำ คัดสรรและแบ่งปันโดยชุมชนครีเอเตอร์ชาวไทย";
+
+export const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : "https://thaiaihub.vercel.app");
+
+export const DEFAULT_SEO_KEYWORDS = [
+  "Prompt ภาษาไทย",
+  "คำสั่ง ChatGPT ภาษาไทย",
+  "รวม Prompt AI",
+  "Prompt Midjourney",
+  "คลัง Prompt AI",
+  "แจก Prompt ฟรี",
+  "คำสั่ง AI สร้างภาพ",
+  "Prompt การตลาด",
+  "Prompt เขียนโค้ด",
+  "Prompt ธุรกิจ",
+  "Thai AI Hub",
+  "เครื่องมือ AI",
+];
 
 /**
  * Filter chips under the hero search field and the submit form's choices.

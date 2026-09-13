@@ -12,7 +12,7 @@ import { UpvoteButton } from "@/components/prompt/UpvoteButton";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
-import { categoryLabel } from "@/lib/constants";
+import { categoryLabel, SITE_NAME, SITE_URL } from "@/lib/constants";
 import { getPromptBySlug, getPromptImages } from "@/data/prompts";
 import { formatCount } from "@/lib/utils";
 
@@ -23,9 +23,50 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const prompt = await getPromptBySlug(slug);
+  if (!prompt) {
+    return {
+      title: "ไม่พบ Prompt",
+    };
+  }
+
+  const categoryName = categoryLabel(prompt.category);
+  const title = `${prompt.title} — Prompt ${categoryName}`;
+  const description =
+    prompt.excerpt ||
+    `Prompt ${prompt.title} หมวดหมู่ ${categoryName} สำหรับใช้งานกับเครื่องมือ AI คัดสรรบน Thai AI Hub`;
+  const url = `${SITE_URL}/prompt/${encodeURIComponent(prompt.slug)}`;
+  const images = prompt.coverUrl ? [{ url: prompt.coverUrl }] : undefined;
+
   return {
-    title: prompt?.title ?? "ไม่พบ Prompt",
-    description: prompt?.excerpt,
+    title,
+    description,
+    keywords: [
+      `Prompt ${prompt.title}`,
+      `Prompt ${categoryName}`,
+      ...(prompt.tags ?? []),
+      "Thai AI Hub",
+      "แจก Prompt ฟรี",
+    ],
+    alternates: {
+      canonical: url,
+    },
+    openGraph: {
+      type: "article",
+      title,
+      description,
+      url,
+      siteName: SITE_NAME,
+      locale: "th_TH",
+      publishedTime: prompt.createdAt,
+      authors: [prompt.author.name],
+      images,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: prompt.coverUrl ? [prompt.coverUrl] : undefined,
+    },
   };
 }
 
@@ -40,8 +81,54 @@ export default async function PromptDetailPage({
 
   const gallery = await getPromptImages(prompt.id);
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "CreativeWork",
+    headline: prompt.title,
+    description: prompt.excerpt,
+    url: `${SITE_URL}/prompt/${encodeURIComponent(prompt.slug)}`,
+    datePublished: prompt.createdAt,
+    inLanguage: "th-TH",
+    author: {
+      "@type": "Person",
+      name: prompt.author.name,
+      ...(prompt.author.handle
+        ? { url: `${SITE_URL}/u/${encodeURIComponent(prompt.author.handle)}` }
+        : {}),
+    },
+    genre: categoryLabel(prompt.category),
+    keywords: prompt.tags?.join(", "),
+    interactionStatistic: [
+      {
+        "@type": "InteractionCounter",
+        interactionType: "https://schema.org/LikeAction",
+        userInteractionCount: prompt.upvotes,
+      },
+      {
+        "@type": "InteractionCounter",
+        interactionType: "https://schema.org/ViewAction",
+        userInteractionCount: prompt.views,
+      },
+    ],
+    ...(prompt.ratingCount > 0
+      ? {
+          aggregateRating: {
+            "@type": "AggregateRating",
+            ratingValue: prompt.rating.toFixed(1),
+            reviewCount: prompt.ratingCount,
+            bestRating: 5,
+            worstRating: 1,
+          },
+        }
+      : {}),
+  };
+
   return (
     <article className="space-y-5">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <ViewCounter promptId={prompt.id} />
 
       <OwnerActions

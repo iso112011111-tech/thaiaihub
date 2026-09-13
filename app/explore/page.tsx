@@ -6,7 +6,20 @@ import { Pagination } from "@/components/ui/Pagination";
 import { searchPrompts } from "@/data/prompts";
 import type { CategoryId } from "@/types";
 
-export const metadata: Metadata = { title: "สำรวจ Prompt" };
+export const metadata: Metadata = {
+  title: "สำรวจ Prompt ทั้งหมด — คลังคำสั่ง AI ภาษาไทย",
+  description:
+    "ค้นหาและเลือกดู Prompt AI คุณภาพสูง ทั้ง ChatGPT, Midjourney, งานเขียน, การตลาด, วิเคราะห์ข้อมูล และโค้ดโปรแกรม",
+  alternates: {
+    canonical: "/explore",
+  },
+  openGraph: {
+    title: "สำรวจ Prompt ทั้งหมด — Thai AI Hub",
+    description:
+      "ค้นหาและเลือกดู Prompt AI คุณภาพสูง ทั้ง ChatGPT, Midjourney, งานเขียน, การตลาด, วิเคราะห์ข้อมูล และโค้ดโปรแกรม",
+    url: "/explore",
+  },
+};
 
 /** Three full rows on the widest 4-column grid, and an even count for 2 or 3 columns. */
 const PAGE_SIZE = 12;

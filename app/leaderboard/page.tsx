@@ -5,7 +5,20 @@ import { Card } from "@/components/ui/Card";
 import { getTopContributors } from "@/data/community";
 import { formatCount } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "กระดานอันดับ" };
+export const metadata: Metadata = {
+  title: "กระดานอันดับนักสร้าง Prompt ยอดนิยม",
+  description:
+    "จัดอันดับนักสร้างสรรค์และแบ่งปัน Prompt AI ชั้นนำของชุมชน Thai AI Hub วัดจากจำนวน Prompt ที่เผยแพร่และคะแนนโหวตสะสม",
+  alternates: {
+    canonical: "/leaderboard",
+  },
+  openGraph: {
+    title: "กระดานอันดับนักสร้าง Prompt — Thai AI Hub",
+    description:
+      "จัดอันดับนักสร้างสรรค์และแบ่งปัน Prompt AI ชั้นนำของชุมชน Thai AI Hub วัดจากจำนวน Prompt ที่เผยแพร่และคะแนนโหวตสะสม",
+    url: "/leaderboard",
+  },
+};
 
 // Content lives in Firestore, so this page must not be frozen at build time.
 export const revalidate = 60;
