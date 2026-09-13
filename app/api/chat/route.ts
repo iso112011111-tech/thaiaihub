@@ -225,11 +225,25 @@ const SYSTEM_RULES = `คุณคือ "AI THAI BOT" ผู้ช่วยป�
  * talked the model into it could otherwise turn the bot into a phishing link.
  */
 async function withoutForeignLinks(reply: string): Promise<string> {
-  const allowed = (await getAiTools()).map((tool) => new URL(tool.url).hostname.replace(/^www\./, ""));
+  // A listed tool vouches for its own address only. A tool listed by page
+  // (github.com/features/copilot) must not make every page on that host
+  // linkable, since anyone can publish under github.com; subdomains are
+  // accepted only for tools listed by their whole site.
+  const allowed = (await getAiTools()).map((tool) => {
+    const url = new URL(tool.url);
+    return { host: url.hostname.replace(/^www\./, ""), path: url.pathname.replace(/\/+$/, "") };
+  });
   return reply.replace(/\b(?:https?:\/\/|www\.)[^\s<>"'()]+/gi, (link) => {
     try {
-      const host = new URL(link.startsWith("www.") ? `https://${link}` : link).hostname.replace(/^www\./, "");
-      return allowed.some((domain) => host === domain || host.endsWith(`.${domain}`)) ? link : "";
+      const url = new URL(link.startsWith("www.") ? `https://${link}` : link);
+      const host = url.hostname.replace(/^www\./, "");
+      const path = url.pathname.replace(/\/+$/, "");
+      const ok = allowed.some((tool) =>
+        tool.path === ""
+          ? host === tool.host || host.endsWith(`.${tool.host}`)
+          : host === tool.host && (path === tool.path || path.startsWith(`${tool.path}/`)),
+      );
+      return ok ? link : "";
     } catch {
       return "";
     }
