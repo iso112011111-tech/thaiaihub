@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { ArrowBigUp, FileText, Users } from "lucide-react";
 import { FeaturedGrid } from "@/components/home/FeaturedGrid";
 import { Avatar } from "@/components/ui/Avatar";
 import { Card } from "@/components/ui/Card";
 import { Pagination } from "@/components/ui/Pagination";
-import { getAuthorProfile } from "@/data/community";
+import { getAuthorByHandle, getPromptsByAuthorId } from "@/data/prompts";
 import { formatCount } from "@/lib/utils";
 
+/** Same page size as /explore: three full rows on the widest grid. */
 const PAGE_SIZE = 12;
 
 export async function generateMetadata({
@@ -15,14 +17,16 @@ export async function generateMetadata({
   params: Promise<{ handle: string }>;
 }): Promise<Metadata> {
   const { handle } = await params;
-  const profile = await getAuthorProfile(handle);
+  const author = await getAuthorByHandle(handle);
+  if (!author) return { title: "ไม่พบผู้ใช้" };
+
   return {
-    title: profile ? `${profile.author.name} (@${profile.author.handle})` : "ไม่พบผู้ใช้",
+    title: `${author.name} (@${author.handle})`,
+    description: `รวมผลงาน Prompt ที่สร้างและแบ่งปันโดย ${author.name}`,
   };
 }
 
-/** Public author page: who they are and the prompts they have shared. */
-export default async function AuthorPage({
+export default async function UserProfilePage({
   params,
   searchParams,
 }: {
@@ -30,44 +34,82 @@ export default async function AuthorPage({
   searchParams: Promise<{ page?: string }>;
 }) {
   const [{ handle }, { page: pageParam }] = await Promise.all([params, searchParams]);
-  const profile = await getAuthorProfile(handle);
-  if (!profile) notFound();
+  const author = await getAuthorByHandle(handle);
+  if (!author) notFound();
 
-  const { author, prompts, totalUpvotes } = profile;
+  const prompts = await getPromptsByAuthorId(author.id);
+  const totalViews = prompts.reduce((sum, p) => sum + p.views, 0);
+  const totalUpvotes = prompts.reduce((sum, p) => sum + p.upvotes, 0);
+
+  // A prolific author must not turn this into one endless page.
   const totalPages = Math.max(1, Math.ceil(prompts.length / PAGE_SIZE));
   const page = Math.min(totalPages, Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1));
   const visible = prompts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
-    <div className="space-y-6">
-      <Card className="flex flex-wrap items-center gap-4 p-5">
-        <Avatar name={author.name} src={author.avatarUrl} size="xl" />
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl font-bold tracking-tight text-ink">{author.name}</h1>
-          <p className="mt-0.5 text-sm text-ink-muted">@{author.handle}</p>
+    <div className="space-y-8">
+      {/* Profile Header Card */}
+      <Card className="p-6 sm:p-8">
+        <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-4 sm:gap-5">
+            <Avatar name={author.name} src={author.avatarUrl} size="xl" />
+            <div>
+              <h1 className="text-xl font-bold tracking-tight text-ink sm:text-2xl">
+                {author.name}
+              </h1>
+              <p className="mt-1 text-sm font-medium text-ink-muted">@{author.handle}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3 border-t border-line pt-4 sm:border-t-0 sm:border-l sm:pl-6 sm:pt-0">
+            <div className="text-center sm:text-left">
+              <span className="flex items-center justify-center gap-1 text-xs text-ink-muted sm:justify-start">
+                <FileText className="size-3.5" />
+                Prompts
+              </span>
+              <p className="mt-1 text-lg font-bold tabular-nums text-ink">
+                {formatCount(prompts.length)}
+              </p>
+            </div>
+
+            <div className="text-center sm:text-left">
+              <span className="flex items-center justify-center gap-1 text-xs text-ink-muted sm:justify-start">
+                <Users className="size-3.5" />
+                ยอดอ่าน
+              </span>
+              <p className="mt-1 text-lg font-bold tabular-nums text-ink">
+                {formatCount(totalViews)}
+              </p>
+            </div>
+
+            <div className="text-center sm:text-left">
+              <span className="flex items-center justify-center gap-1 text-xs text-ink-muted sm:justify-start">
+                <ArrowBigUp className="size-3.5" />
+                โหวต
+              </span>
+              <p className="mt-1 text-lg font-bold tabular-nums text-accent-hover">
+                {formatCount(totalUpvotes)}
+              </p>
+            </div>
+          </div>
         </div>
-        <dl className="flex gap-6 text-center">
-          <div>
-            <dd className="text-lg font-semibold tabular-nums text-ink">{formatCount(prompts.length)}</dd>
-            <dt className="text-xs text-ink-muted">Prompt</dt>
-          </div>
-          <div>
-            <dd className="text-lg font-semibold tabular-nums text-ink">{formatCount(totalUpvotes)}</dd>
-            <dt className="text-xs text-ink-muted">โหวตสะสม</dt>
-          </div>
-        </dl>
       </Card>
 
+      {/* Prompts by this author */}
       <section className="space-y-4">
-        <h2 className="text-sm font-semibold text-ink">Prompt ที่แบ่งปัน</h2>
+        <h2 className="text-lg font-bold tracking-tight text-ink">
+          ผลงาน Prompt ({prompts.length})
+        </h2>
+
         {visible.length > 0 ? (
           <>
             <FeaturedGrid prompts={visible} />
             <Pagination page={page} totalPages={totalPages} basePath={`/u/${author.handle}`} />
           </>
         ) : (
-          <div className="rounded-card border border-dashed border-line-strong py-12 text-center text-sm text-ink-muted">
-            ยังไม่ได้แบ่งปัน prompt
+          <div className="rounded-card border border-dashed border-line-strong py-16 text-center">
+            <p className="text-sm font-medium text-ink">ยังไม่มีผลงานที่เผยแพร่</p>
+            <p className="mt-1 text-xs text-ink-muted">ผู้ใช้คนนี้ยังไม่ได้ส่ง prompt ลงในระบบ</p>
           </div>
         )}
       </section>

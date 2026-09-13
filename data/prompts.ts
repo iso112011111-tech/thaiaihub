@@ -4,7 +4,7 @@ import { adminDb } from "@/lib/firebase/admin";
 import { COLLECTIONS } from "@/lib/firebase/collections";
 import { safeImageSrc } from "@/lib/images/safe-src";
 import { seedPrompts } from "./seed";
-import type { CategoryId, Prompt } from "@/types";
+import type { Author, CategoryId, Prompt } from "@/types";
 
 /**
  * Read side of the prompt library. Everything goes through Firestore via the
@@ -255,7 +255,7 @@ export async function searchPrompts({
   const all = await getAllPrompts();
   const needle = q.trim().toLowerCase();
 
-  const matches = all.filter((prompt) => {
+  const filtered = all.filter((prompt) => {
     const matchesCategory = category === "all" || prompt.category === category;
     if (!matchesCategory) return false;
     if (!needle) return true;
@@ -264,8 +264,54 @@ export async function searchPrompts({
       .includes(needle);
   });
 
+  // Same ordering as the home page's popular section, so the two never disagree.
   // filter() already returned a new array, so sorting it leaves the cache untouched.
-  return sort === "popular" ? matches.sort(byPopularity) : matches;
+  return sort === "popular" ? filtered.sort(byPopularity) : filtered;
+}
+
+/** Handles are lowercase letters, digits and underscore; seed data may also use dots or dashes. */
+const HANDLE_SHAPE = /^[a-z0-9_.-]{1,40}$/;
+
+/**
+ * The public author behind /u/[handle]: name, handle and avatar only.
+ *
+ * No prompt count comes from the profile — that field was once writable from the
+ * browser, so old documents may hold made-up numbers. Pages count real prompts.
+ */
+export async function getAuthorByHandle(handle: string): Promise<Author | undefined> {
+  const normalized = handle.toLowerCase();
+  if (!HANDLE_SHAPE.test(normalized)) return undefined;
+
+  const db = adminDb();
+  if (db) {
+    try {
+      const snap = await db
+        .collection(COLLECTIONS.users)
+        .where("handle", "==", normalized)
+        .limit(1)
+        .get();
+      if (!snap.empty) {
+        const doc = snap.docs[0];
+        const data = doc.data();
+        return {
+          id: doc.id,
+          name: data.name ?? "ไม่ระบุชื่อ",
+          handle: data.handle ?? normalized,
+          avatarUrl: data.photoURL ?? undefined,
+        };
+      }
+    } catch (error) {
+      console.error("[firestore] อ่านโปรไฟล์ผู้เขียนไม่สำเร็จ", error);
+    }
+  }
+
+  const all = await getAllPrompts();
+  return all.find((p) => p.author.handle.toLowerCase() === normalized)?.author;
+}
+
+export async function getPromptsByAuthorId(authorId: string): Promise<Prompt[]> {
+  const all = await getAllPrompts();
+  return all.filter((p) => p.author.id === authorId);
 }
 
 /** Extra images live one-per-document so no single doc approaches Firestore's 1 MiB cap. */
