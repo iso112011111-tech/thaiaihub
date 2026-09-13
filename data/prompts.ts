@@ -1,0 +1,255 @@
+import "server-only";
+
+import { adminDb } from "@/lib/firebase/admin";
+import { COLLECTIONS } from "@/lib/firebase/collections";
+import { safeImageSrc } from "@/lib/images/safe-src";
+import { seedPrompts } from "./seed";
+import type { CategoryId, Prompt } from "@/types";
+
+/**
+ * Read side of the prompt library. Everything goes through Firestore via the
+ * Admin SDK; when the credential is missing or the collection is still empty
+ * we fall back to the seed list so the site renders during setup.
+ */
+
+/** Hidden by an admin: gone from every list, search, its own page and the AI bot. */
+function isHidden(data: FirebaseFirestore.DocumentData): boolean {
+  return data.status === "hidden";
+}
+
+/** Most upvoted first; views break ties. Used by the home page and /explore?sort=popular. */
+function byPopularity(a: Prompt, b: Prompt): number {
+  return b.upvotes - a.upvotes || b.views - a.views;
+}
+
+function toPrompt(id: string, data: FirebaseFirestore.DocumentData): Prompt {
+  return {
+    id,
+    slug: data.slug ?? id,
+    title: data.title ?? "",
+    excerpt: data.excerpt ?? "",
+    body: data.body ?? "",
+    category: data.category ?? "other",
+    tags: Array.isArray(data.tags) ? data.tags : [],
+    author: {
+      id: data.author?.id ?? "",
+      name: data.author?.name ?? "ไม่ระบุชื่อ",
+      handle: data.author?.handle ?? "",
+      avatarUrl: data.author?.avatarUrl ?? undefined,
+      promptCount: data.author?.promptCount ?? 0,
+    },
+    upvotes: data.upvotes ?? 0,
+    views: data.views ?? 0,
+    rating: data.rating ?? 0,
+    ratingCount: data.ratingCount ?? 0,
+    coverUrl: data.coverUrl ?? undefined,
+    createdAt:
+      typeof data.createdAt?.toDate === "function"
+        ? data.createdAt.toDate().toISOString().slice(0, 10)
+        : (data.createdAt ?? ""),
+  };
+}
+
+/**
+ * Replaces the author snapshot stored on each prompt with the live profile.
+ *
+ * Prompts keep a copy of the author's name and avatar from the moment they were
+ * created, which is fast but goes stale the second someone edits their profile.
+ * One batched read of the `users` documents fixes every prompt on the page; the
+ * stored copy remains the fallback for seed rows and deleted accounts.
+ */
+async function withLiveAuthors(prompts: Prompt[]): Promise<Prompt[]> {
+  const db = adminDb();
+  if (!db || prompts.length === 0) return prompts;
+
+  const ids = [...new Set(prompts.map((prompt) => prompt.author.id).filter(Boolean))];
+  if (ids.length === 0) return prompts;
+
+  try {
+    const snapshots = await db.getAll(
+      ...ids.map((id) => db.collection(COLLECTIONS.users).doc(id)),
+    );
+
+    const live = new Map<string, { name?: string; handle?: string; photoURL?: string }>();
+    for (const snapshot of snapshots) {
+      if (snapshot.exists) live.set(snapshot.id, snapshot.data() ?? {});
+    }
+
+    return prompts.map((prompt) => {
+      const profile = live.get(prompt.author.id);
+      if (!profile) return prompt;
+      return {
+        ...prompt,
+        author: {
+          ...prompt.author,
+          name: profile.name ?? prompt.author.name,
+          handle: profile.handle ?? prompt.author.handle,
+          avatarUrl: profile.photoURL ?? prompt.author.avatarUrl,
+        },
+      };
+    });
+  } catch (error) {
+    console.error("[firestore] ดึงโปรไฟล์ผู้เขียนไม่สำเร็จ ใช้ข้อมูลที่ฝังไว้แทน", error);
+    return prompts;
+  }
+}
+
+/** Firestore reads per round trip while walking the whole collection. */
+const BATCH_SIZE = 500;
+/** How long counters (views, votes, ratings) may lag behind the database. */
+const CACHE_TTL_MS = 60_000;
+
+interface PromptsCache {
+  prompts: Prompt[];
+  count: number;
+  fetchedAt: number;
+}
+
+// Kept on globalThis because Next bundles route handlers and pages separately;
+// a module-level variable would give each bundle its own copy, and an edit made
+// through the API would not clear the copy the pages read.
+const store = globalThis as typeof globalThis & { __promptsCache?: PromptsCache | null };
+
+/** Call after a server-side write so the next read sees it immediately. */
+export function invalidatePromptsCache() {
+  store.__promptsCache = null;
+}
+
+async function fetchEveryPrompt(db: FirebaseFirestore.Firestore): Promise<Prompt[]> {
+  const prompts: Prompt[] = [];
+  let cursor: FirebaseFirestore.QueryDocumentSnapshot | undefined;
+
+  for (;;) {
+    let query = db.collection(COLLECTIONS.prompts).orderBy("createdAt", "desc").limit(BATCH_SIZE);
+    if (cursor) query = query.startAfter(cursor);
+    const snapshot = await query.get();
+    // Hidden prompts are filtered here rather than in the query: a `status !=`
+    // filter would force ordering by status and need a composite index.
+    for (const doc of snapshot.docs) {
+      if (!isHidden(doc.data())) prompts.push(toPrompt(doc.id, doc.data()));
+    }
+    if (snapshot.size < BATCH_SIZE) break;
+    cursor = snapshot.docs[snapshot.docs.length - 1];
+  }
+  return prompts;
+}
+
+/**
+ * Every prompt, newest first — no cap, so old prompts stay searchable forever.
+ *
+ * Reading the whole collection on every request would bill one read per prompt
+ * per page view, so the list is cached. New prompts are written straight from
+ * the browser and the server is never told, so each call first asks Firestore
+ * for the document count (one cheap aggregate read): a new or deleted prompt
+ * changes it and forces a refetch right away. Edits go through our API, which
+ * calls `invalidatePromptsCache`. Only counters can be up to a minute stale.
+ */
+export async function getAllPrompts(): Promise<Prompt[]> {
+  const db = adminDb();
+  if (!db) return seedPrompts;
+
+  try {
+    const count = (await db.collection(COLLECTIONS.prompts).count().get()).data().count;
+    if (count === 0) return seedPrompts;
+
+    const cached = store.__promptsCache;
+    if (cached && cached.count === count && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
+      return cached.prompts;
+    }
+
+    const prompts = await withLiveAuthors(await fetchEveryPrompt(db));
+    store.__promptsCache = { prompts, count, fetchedAt: Date.now() };
+    return prompts;
+  } catch (error) {
+    console.error("[firestore] อ่าน prompts ไม่สำเร็จ ใช้ข้อมูลตัวอย่างแทน", error);
+    return store.__promptsCache?.prompts ?? seedPrompts;
+  }
+}
+
+export async function getFeaturedPrompts(limit = 6): Promise<Prompt[]> {
+  return (await getAllPrompts()).slice(0, limit);
+}
+
+export async function getPopularPrompts(limit = 4): Promise<Prompt[]> {
+  const all = await getAllPrompts();
+  return [...all].sort(byPopularity).slice(0, limit);
+}
+
+export async function getPromptBySlug(slug: string): Promise<Prompt | undefined> {
+  const db = adminDb();
+  if (db) {
+    try {
+      const snapshot = await db
+        .collection(COLLECTIONS.prompts)
+        .where("slug", "==", slug)
+        .limit(10)
+        .get();
+      if (!snapshot.empty) {
+        // Firestore cannot enforce unique slugs. If two prompts ever share one,
+        // the first to exist owns the URL: createTime is set by Firestore itself,
+        // so a later prompt copying the slug cannot take the page over.
+        const [doc] = [...snapshot.docs].sort(
+          (a, b) => a.createTime.toMillis() - b.createTime.toMillis(),
+        );
+        // A hidden prompt 404s; it must not fall through to a seed with the same slug.
+        if (isHidden(doc.data())) return undefined;
+        const [hydrated] = await withLiveAuthors([toPrompt(doc.id, doc.data())]);
+        return hydrated;
+      }
+    } catch (error) {
+      console.error("[firestore] อ่าน prompt ไม่สำเร็จ", error);
+    }
+  }
+  return seedPrompts.find((prompt) => prompt.slug === slug);
+}
+
+export type PromptSort = "latest" | "popular";
+
+export async function searchPrompts({
+  q = "",
+  category = "all",
+  sort = "latest",
+}: {
+  q?: string;
+  category?: CategoryId;
+  /** `latest`: newest first (the stored order). `popular`: most upvoted, then most viewed. */
+  sort?: PromptSort;
+}): Promise<Prompt[]> {
+  // Firestore has no substring search, so filtering happens in memory. Swap for
+  // Algolia or Typesense once the library outgrows a few hundred prompts.
+  const all = await getAllPrompts();
+  const needle = q.trim().toLowerCase();
+
+  const matches = all.filter((prompt) => {
+    const matchesCategory = category === "all" || prompt.category === category;
+    if (!matchesCategory) return false;
+    if (!needle) return true;
+    return `${prompt.title} ${prompt.excerpt} ${prompt.tags.join(" ")}`
+      .toLowerCase()
+      .includes(needle);
+  });
+
+  // filter() already returned a new array, so sorting it leaves the cache untouched.
+  return sort === "popular" ? matches.sort(byPopularity) : matches;
+}
+
+/** Extra images live one-per-document so no single doc approaches Firestore's 1 MiB cap. */
+export async function getPromptImages(promptId: string): Promise<string[]> {
+  const db = adminDb();
+  if (!db) return [];
+  try {
+    const snapshot = await db
+      .collection(COLLECTIONS.prompts)
+      .doc(promptId)
+      .collection("images")
+      .orderBy("order")
+      .get();
+    // Rendered as plain <img>; anything but a trusted source is dropped.
+    return snapshot.docs
+      .map((doc) => safeImageSrc(doc.data().dataUri as string | undefined))
+      .filter((src): src is string => Boolean(src));
+  } catch (error) {
+    console.error("[firestore] อ่านภาพประกอบไม่สำเร็จ", error);
+    return [];
+  }
+}

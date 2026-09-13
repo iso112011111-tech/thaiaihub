@@ -1,0 +1,146 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------
+   Design tokens
+   Single source of truth for colour, radius, shadow and type.
+   Every component consumes these — never raw hex values.
+------------------------------------------------------------------- */
+@theme {
+  /* Surfaces */
+  --color-canvas: #f5f7f9;
+  --color-surface: #ffffff;
+  --color-surface-muted: #fafbfc;
+  --color-line: #e7eaee;
+  --color-line-strong: #d6dbe2;
+
+  /* Text */
+  --color-ink: #0b1117;
+  --color-ink-soft: #47535f;
+  --color-ink-muted: #7b8794;
+
+  /* Accent — mint / teal */
+  --color-accent: #07b8a2;
+  --color-accent-hover: #059e8b;
+  --color-accent-soft: #e7faf6;
+  --color-accent-ring: #b6ede4;
+
+  /* Secondary accent — electric blue, used sparingly for data & links */
+  --color-electric: #2f6bff;
+  --color-electric-soft: #eef3ff;
+
+  /* Status */
+  --color-flame: #f4753b;
+
+  /* Radius */
+  --radius-card: 16px;
+  --radius-field: 12px;
+  --radius-pill: 999px;
+
+  /* Elevation — low contrast, no heavy drop shadows */
+  --shadow-card: 0 1px 2px rgb(11 17 23 / 0.04), 0 8px 24px -12px rgb(11 17 23 / 0.10);
+  --shadow-card-hover: 0 2px 4px rgb(11 17 23 / 0.05), 0 18px 40px -18px rgb(11 17 23 / 0.18);
+  --shadow-rail: 0 1px 2px rgb(11 17 23 / 0.03);
+
+  /* Type */
+  --font-sans: var(--font-inter), var(--font-thai), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Motion — translucent ring that swells out of a button and fades */
+  --animate-ripple: ripple 1.2s cubic-bezier(0, 0, 0.2, 1) infinite;
+  /* Launcher bounces once and vanishes as the chat opens, and pops back on close */
+  --animate-pop-out: pop-out 260ms ease-in forwards;
+  --animate-pop-in: pop-in 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  @keyframes pop-out {
+    0% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    35% {
+      transform: scale(1.18);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(0);
+      opacity: 0;
+    }
+  }
+
+  @keyframes pop-in {
+    from {
+      transform: scale(0);
+      opacity: 0;
+    }
+    to {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  /* Chat window grows out of the launcher's corner */
+  --animate-chat-in: chat-in 180ms ease-out;
+
+  @keyframes chat-in {
+    from {
+      transform: translateY(8px) scale(0.96);
+      opacity: 0;
+    }
+    to {
+      transform: none;
+      opacity: 1;
+    }
+  }
+
+  @keyframes ripple {
+    0% {
+      transform: scale(1);
+      opacity: 0.45;
+    }
+    100% {
+      transform: scale(2.1);
+      opacity: 0;
+    }
+  }
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background-color: var(--color-accent-ring);
+    color: var(--color-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+}
+
+@layer utilities {
+  /* Horizontal carousels keep their scroll behaviour without a visible bar */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Sticky rails get a thin, unobtrusive scrollbar */
+  .rail-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line-strong) transparent;
+  }
+}

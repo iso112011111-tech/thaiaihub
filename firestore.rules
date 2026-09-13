@@ -1,0 +1,171 @@
+rules_version = '2';
+
+// Keep the limits here in step with lib/prompt-limits.ts and lib/images/safe-src.ts.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // A compressed image produced by our own uploader, stored inline.
+    function isDataImage(value, maxChars) {
+      return value is string
+        && value.size() <= maxChars
+        && value.matches('data:image/(webp|png|jpeg);base64,[A-Za-z0-9+/]+={0,2}');
+    }
+
+    // Avatars: an uploaded image, or the Google account photo. Arbitrary hosts
+    // are refused so a profile cannot become a tracking pixel for every viewer.
+    function isAvatar(value) {
+      return isDataImage(value, 61440)
+        || (value is string
+            && value.size() <= 2048
+            && value.matches('https://lh3[.]googleusercontent[.]com/[^ ]+'));
+    }
+
+    function validName(value) {
+      return value is string && value.size() >= 1 && value.size() <= 60;
+    }
+
+    function validCategory(value) {
+      return value in ['chatgpt', 'midjourney', 'image', 'agent', 'marketing', 'video', 'code', 'other'];
+    }
+
+    function validPromptContent(data) {
+      return data.title is string && data.title.size() >= 1 && data.title.size() <= 120
+        && data.excerpt is string && data.excerpt.size() <= 120
+        && data.body is string && data.body.size() >= 1 && data.body.size() <= 20000
+        && validCategory(data.category)
+        && data.tags is list && data.tags.size() <= 10;
+    }
+
+    match /prompts/{promptId} {
+      allow read: if true;
+
+      // Prompts are created from the browser, so every field is pinned: the
+      // author is the caller, counters start at zero and the timestamp is the
+      // server's. Otherwise a new prompt could claim a million views or a date
+      // in the future and sit at the top of every list.
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+             'slug', 'title', 'excerpt', 'body', 'category', 'tags', 'coverUrl',
+             'imageCount', 'author', 'upvotes', 'views', 'rating', 'ratingCount',
+             'status', 'createdAt'])
+        && validPromptContent(request.resource.data)
+        && request.resource.data.slug is string
+        && request.resource.data.slug.matches('[a-z0-9฀-๿-]{1,61}-[a-z0-9]{6}')
+        && request.resource.data.author.keys().hasOnly(['id', 'name', 'handle', 'avatarUrl'])
+        && request.resource.data.author.id == request.auth.uid
+        && validName(request.resource.data.author.name)
+        && request.resource.data.author.handle is string
+        && request.resource.data.author.handle.size() <= 40
+        && (request.resource.data.author.get('avatarUrl', null) == null
+            || isAvatar(request.resource.data.author.avatarUrl))
+        && (request.resource.data.get('coverUrl', null) == null
+            || isDataImage(request.resource.data.coverUrl, 122880))
+        && request.resource.data.imageCount is int
+        && request.resource.data.imageCount >= 0
+        && request.resource.data.imageCount <= 6
+        && request.resource.data.upvotes == 0
+        && request.resource.data.views == 0
+        && request.resource.data.rating == 0
+        && request.resource.data.ratingCount == 0
+        && request.resource.data.status == 'published'
+        && request.resource.data.createdAt == request.time;
+
+      // Edits and deletes go through /api/prompts/[id] (Admin SDK), which
+      // validates input and cleans up subcollections. A direct client write
+      // could rename the slug to take over another prompt's URL, or rewrite
+      // counters and dates.
+      allow update, delete: if false;
+
+      // Extra artwork, one compressed data URI per document.
+      match /images/{imageId} {
+        allow read: if true;
+
+        // Only while the parent prompt is created in the same batch: it does not
+        // exist before the commit and belongs to the caller after it. Later
+        // changes go through the edit API.
+        allow create: if signedIn()
+          && request.resource.data.keys().hasOnly(['authorId', 'order', 'dataUri', 'bytes'])
+          && request.resource.data.authorId == request.auth.uid
+          && imageId in ['0', '1', '2', '3', '4']
+          && request.resource.data.order is int
+          && isDataImage(request.resource.data.dataUri, 184320)
+          && !exists(/databases/$(database)/documents/prompts/$(promptId))
+          && getAfter(/databases/$(database)/documents/prompts/$(promptId)).data.author.id == request.auth.uid;
+
+        allow update, delete: if false;
+      }
+
+      // ratings/{uid} is not matched here, so the catch-all below denies it:
+      // ratings move only through /api/prompts/[id]/rate.
+    }
+
+    // Profiles are private to their owner. They hold account details (older
+    // profiles stored the email address); public author info is served by the
+    // server from the prompts themselves.
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+
+      allow create: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(['uid', 'handle', 'name', 'photoURL', 'createdAt', 'lastSeenAt'])
+        && request.resource.data.uid == uid
+        && request.resource.data.handle is string
+        && request.resource.data.handle.matches('[a-z0-9_]{3,30}')
+        && validName(request.resource.data.name)
+        && (request.resource.data.get('photoURL', null) == null || isAvatar(request.resource.data.photoURL))
+        // The username must be reserved for this account in the same batch.
+        && getAfter(/databases/$(database)/documents/handles/$(request.resource.data.handle)).data.uid == uid;
+
+      // Name, avatar and last-seen only. The handle is fixed after sign-up, and
+      // counters such as promptCount are derived on the server from real prompts
+      // so nobody can edit their way up the leaderboard.
+      allow update: if isOwner(uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'photoURL', 'lastSeenAt'])
+        && (!('name' in request.resource.data.diff(resource.data).affectedKeys())
+            || validName(request.resource.data.name))
+        && (!('photoURL' in request.resource.data.diff(resource.data).affectedKeys())
+            || request.resource.data.photoURL == null
+            || isAvatar(request.resource.data.photoURL));
+
+      allow delete: if false;
+    }
+
+    // handles/{handle} reserves a username for one account. Reading a single
+    // reservation is public so sign-up can tell whether a name is free; listing
+    // them is not. Creating a reservation that already exists counts as an
+    // update, which is denied — that is what keeps usernames unique.
+    match /handles/{handle} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['uid'])
+        && request.resource.data.uid == request.auth.uid
+        && handle.matches('[a-z0-9_]{3,30}')
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.handle == handle;
+      allow update, delete: if false;
+    }
+
+    // reports/{promptId}_{uid} are written and read only by the server, so the
+    // catch-all below denies them.
+
+    // Votes are written only by /api/prompts/[id]/vote. If a browser could
+    // create one directly, the toggle would later "remove" a vote that never
+    // added to the count, and repeating that drives any prompt's score down.
+    // Reads are closed too: vote ids reveal who voted for what.
+    match /votes/{voteId} {
+      allow read, write: if false;
+    }
+
+    // Anything not listed above is denied.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
