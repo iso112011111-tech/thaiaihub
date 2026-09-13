@@ -1,18 +1,29 @@
 import Image from "next/image";
 import { SearchBar } from "./SearchBar";
 
-const stats = [
-  { value: "12,400+", label: "Prompt ในระบบ" },
-  { value: "3,800+", label: "ผู้ร่วมแบ่งปัน" },
-  { value: "42", label: "เครื่องมือ AI" },
-];
+/** Live totals, counted by the home page from the real library. */
+export interface HeroStats {
+  prompts: number;
+  contributors: number;
+  tools: number;
+}
 
 /**
  * Above-the-fold panel. The artwork keeps its own column so it never collides
  * with the copy, and the panel tint matches the illustration's background so
  * the two read as one continuous surface.
  */
-export function Hero() {
+export function Hero({ stats }: { stats: HeroStats }) {
+  // Real numbers only. Before the first prompt exists there is nothing honest to boast about.
+  const items =
+    stats.prompts > 0
+      ? [
+          { value: stats.prompts.toLocaleString("th-TH"), label: "Prompt ในระบบ" },
+          { value: stats.contributors.toLocaleString("th-TH"), label: "ผู้ร่วมแบ่งปัน" },
+          { value: stats.tools.toLocaleString("th-TH"), label: "เครื่องมือ AI" },
+        ]
+      : [];
+
   return (
     <section
       className="overflow-hidden rounded-card bg-[#f4fbff] sm:bg-[linear-gradient(to_right,#ffffff_0%,#eef8fe_30%,#b3e0fd_52%)]"
@@ -33,8 +44,9 @@ export function Hero() {
 
           <SearchBar className="mt-6 w-full border border-line" />
 
+          {items.length > 0 ? (
           <dl className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-4">
-            {stats.map((stat, index) => (
+            {items.map((stat, index) => (
               <div
                 key={stat.label}
                 className={
@@ -49,6 +61,7 @@ export function Hero() {
               </div>
             ))}
           </dl>
+          ) : null}
         </div>
 
         {/* Mobile: a band above the copy. Desktop: the right column, edge to edge.

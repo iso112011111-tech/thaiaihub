@@ -10,8 +10,8 @@ import { getStorage } from "firebase-admin/storage";
 /**
  * Server-side Firebase. Reads the service account from a gitignored file, or
  * from inline env vars when deploying somewhere without a filesystem (Vercel).
- * Returns null instead of throwing so the site still renders before the key is
- * installed — callers fall back to seed data.
+ * Returns null instead of throwing; the data readers then fail with a clear
+ * message about the missing credentials.
  */
 function loadCredential() {
   const inlineKey = process.env.FIREBASE_PRIVATE_KEY;
@@ -42,7 +42,7 @@ export function getAdminApp(): App | null {
   const credential = loadCredential();
   if (!credential) {
     console.warn(
-      "[firebase-admin] ไม่พบ service account — ใช้ข้อมูลตัวอย่างแทน ดู .env.example",
+      "[firebase-admin] ไม่พบ service account — ตั้งค่า FIREBASE_* ตาม .env.example",
     );
     return (cached = null);
   }

@@ -3,13 +3,12 @@ import "server-only";
 import { adminDb } from "@/lib/firebase/admin";
 import { COLLECTIONS } from "@/lib/firebase/collections";
 import { safeImageSrc } from "@/lib/images/safe-src";
-import { seedPrompts } from "./seed";
 import type { Author, CategoryId, Prompt } from "@/types";
 
 /**
  * Read side of the prompt library. Everything goes through Firestore via the
- * Admin SDK; when the credential is missing or the collection is still empty
- * we fall back to the seed list so the site renders during setup.
+ * Admin SDK. An empty collection is shown as empty — pages have their own
+ * "no prompts yet" states — and there is no sample data behind it.
  */
 
 /** Hidden by an admin: gone from every list, search, its own page and the AI bot. */
@@ -181,18 +180,15 @@ async function fetchEveryPrompt(db: FirebaseFirestore.Firestore): Promise<Prompt
  */
 export async function getAllPrompts(): Promise<Prompt[]> {
   const db = adminDb();
-  const allowSeed = process.env.ALLOW_SEED_FALLBACK !== "false";
-
+  // There is no sample data to fall back on: a site without its database must
+  // fail loudly (at build time on Vercel), never show made-up prompts to real people.
   if (!db) {
-    if (!allowSeed) throw new Error("Firebase Admin DB not initialized and seed fallback is disabled");
-    return seedPrompts;
+    throw new Error("Firebase Admin is not configured — set the FIREBASE_* environment variables");
   }
 
   try {
     const count = (await db.collection(COLLECTIONS.prompts).count().get()).data().count;
-    if (count === 0) {
-      return allowSeed ? seedPrompts : [];
-    }
+    if (count === 0) return [];
 
     const cached = store.__promptsCache;
     if (cached && cached.count === count && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
@@ -204,8 +200,9 @@ export async function getAllPrompts(): Promise<Prompt[]> {
     return prompts;
   } catch (error) {
     console.error("[firestore] อ่าน prompts ไม่สำเร็จ", error);
-    if (!allowSeed) throw error;
-    return store.__promptsCache?.prompts ?? seedPrompts;
+    // A brief Firestore hiccup serves the last good list instead of an error page.
+    if (store.__promptsCache) return store.__promptsCache.prompts;
+    throw error;
   }
 }
 
@@ -234,7 +231,7 @@ export async function getPromptBySlug(slug: string): Promise<Prompt | undefined>
         const [doc] = [...snapshot.docs].sort(
           (a, b) => a.createTime.toMillis() - b.createTime.toMillis(),
         );
-        // A hidden prompt 404s; it must not fall through to a seed with the same slug.
+        // A hidden prompt 404s like one that never existed.
         if (isHidden(doc.data())) return undefined;
         const [hydrated] = await withLiveAuthors([toPrompt(doc.id, doc.data())]);
         return hydrated;
@@ -243,7 +240,7 @@ export async function getPromptBySlug(slug: string): Promise<Prompt | undefined>
       console.error("[firestore] อ่าน prompt ไม่สำเร็จ", error);
     }
   }
-  return seedPrompts.find((prompt) => prompt.slug === slug);
+  return undefined;
 }
 
 export type PromptSort = "latest" | "popular";

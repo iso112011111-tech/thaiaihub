@@ -4,7 +4,6 @@ import {
   LayoutGrid,
   Trophy,
   Upload,
-  Users,
   type LucideIcon,
 } from "lucide-react";
 
@@ -21,5 +20,4 @@ export const primaryNav: NavItem[] = [
   { href: "/tools", label: "เครื่องมือ AI", icon: LayoutGrid },
   { href: "/submit", label: "ส่ง Prompt", icon: Upload },
   { href: "/leaderboard", label: "กระดานอันดับ", icon: Trophy },
-  { href: "/community", label: "ชุมชน", icon: Users },
 ];

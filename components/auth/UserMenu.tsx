@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Bell, LogIn, LogOut, ShieldCheck, Upload, User as UserIcon } from "lucide-react";
+import { LogIn, LogOut, ShieldCheck, Upload, User as UserIcon } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
@@ -52,14 +52,6 @@ export function UserMenu() {
 
   return (
     <div ref={wrapRef} className="relative ml-1 flex items-center gap-1.5">
-      <button
-        type="button"
-        aria-label="การแจ้งเตือน"
-        className="relative hidden size-9 items-center justify-center rounded-field text-ink-soft hover:bg-surface-muted sm:inline-flex"
-      >
-        <Bell className="size-[18px]" />
-      </button>
-
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}

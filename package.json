@@ -6,10 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "typecheck": "tsc --noEmit",
-    "seed": "node --env-file=.env.local scripts/seed.ts",
-    "backfill:handles": "node --env-file=.env.local scripts/backfill-handles.ts"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "clsx": "^2.1.1",

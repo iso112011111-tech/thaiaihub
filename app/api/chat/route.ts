@@ -179,7 +179,7 @@ async function buildSiteContext(
   return [
     `# เว็บไซต์ ${SITE_NAME} — ${SITE_TAGLINE}`,
     `ศูนย์รวม prompt ภาษาไทยสำหรับ ChatGPT, Midjourney และเครื่องมือ AI คัดสรรโดยชุมชน`,
-    `หน้าในเว็บ: หน้าแรก (/), สำรวจ Prompt (/explore), เครื่องมือ AI (/tools), ส่ง Prompt (/submit), กระดานอันดับ (/leaderboard), ชุมชน (/community)`,
+    `หน้าในเว็บ: หน้าแรก (/), สำรวจ Prompt (/explore), เครื่องมือ AI (/tools), ส่ง Prompt (/submit), กระดานอันดับ (/leaderboard)`,
     `หมวดหมู่: ${categories.filter((c) => c.id !== "all").map((c) => c.label).join(", ")}`,
     ``,
     `# Prompt ในเว็บตอนนี้มีทั้งหมด ${total} รายการ`,

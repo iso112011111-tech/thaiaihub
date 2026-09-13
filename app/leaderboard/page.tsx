@@ -24,6 +24,12 @@ export default async function LeaderboardPage() {
         </p>
       </header>
 
+      {contributors.length === 0 ? (
+        <div className="rounded-card border border-dashed border-line-strong py-14 text-center">
+          <p className="text-sm font-medium text-ink">ยังไม่มีผู้แบ่งปัน prompt</p>
+          <p className="mt-1 text-xs text-ink-muted">อันดับจะขึ้นเมื่อมีคนส่ง prompt แรก</p>
+        </div>
+      ) : (
       <Card className="divide-y divide-line">
         {contributors.map((author, index) => {
           const content = (
@@ -59,6 +65,7 @@ export default async function LeaderboardPage() {
           );
         })}
       </Card>
+      )}
     </div>
   );
 }
