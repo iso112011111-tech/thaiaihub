@@ -31,6 +31,11 @@ export const db: Firestore = getFirestore(app);
 export async function initAnalytics() {
   if (typeof window === "undefined") return null;
   if (!firebaseConfig.measurementId) return null;
-  const { getAnalytics, isSupported } = await import("firebase/analytics");
-  return (await isSupported()) ? getAnalytics(app) : null;
+  try {
+    const { getAnalytics, isSupported } = await import("firebase/analytics");
+    return (await isSupported()) ? getAnalytics(app) : null;
+  } catch {
+    // Analytics failures (e.g. adblockers, restricted API keys) should not affect the app.
+    return null;
+  }
 }
