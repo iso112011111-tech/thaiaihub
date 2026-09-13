@@ -22,6 +22,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ["firebase-admin"],
   // Testing from a phone on the LAN hits the dev server cross-origin; Next will
   // require this list in a future major version, so declare it now.
   allowedDevOrigins: ["192.168.1.11"],

@@ -454,31 +454,45 @@ export async function POST(request: Request) {
     return respond({ reply: TOO_FAST, prompts: [] }, { status: 429 });
   }
 
-  const prompts = await getAllPrompts();
-  if (!aiConfigured()) return respond(keywordAnswer(message, prompts));
-
-  // The model is for signed-in members: an account cannot be forged per request
-  // the way an address header can.
-  const token = await getCallerToken(request);
-  if (!token) return respond({ ...keywordAnswer(message, prompts), notice: "login" });
-
-  if (perMember(token.uid)) {
-    return respond({ reply: TOO_FAST, prompts: [] }, { status: 429 });
+  let prompts: Prompt[] = [];
+  try {
+    prompts = await getAllPrompts();
+  } catch (error) {
+    console.error("[chat] ไม่สามารถดึง prompts จากฐานข้อมูลได้:", error);
   }
 
-  const budget = await takeAiBudget(token.uid);
-  if (budget === "user-limit" || budget === "site-limit") {
-    return respond({ ...keywordAnswer(message, prompts), notice: budget });
-  }
+  try {
+    if (!aiConfigured()) return respond(keywordAnswer(message, prompts));
 
-  if (budget === "ok") {
-    try {
-      return respond(await modelAnswer(message.trim(), history, prompts));
-    } catch (error) {
-      console.error("[chat] AI ตอบไม่สำเร็จ ใช้การค้นหาแบบคีย์เวิร์ดแทน", error);
+    // The model is for signed-in members: an account cannot be forged per request
+    // the way an address header can.
+    const token = await getCallerToken(request);
+    if (!token) return respond({ ...keywordAnswer(message, prompts), notice: "login" });
+
+    if (perMember(token.uid)) {
+      return respond({ reply: TOO_FAST, prompts: [] }, { status: 429 });
     }
-  }
 
-  // The budget could not be checked, or the model failed: answer for free.
-  return respond(keywordAnswer(message, prompts));
+    const budget = await takeAiBudget(token.uid);
+    if (budget === "user-limit" || budget === "site-limit") {
+      return respond({ ...keywordAnswer(message, prompts), notice: budget });
+    }
+
+    if (budget === "ok") {
+      try {
+        return respond(await modelAnswer(message.trim(), history, prompts));
+      } catch (error) {
+        console.error("[chat] AI ตอบไม่สำเร็จ ใช้การค้นหาแบบคีย์เวิร์ดแทน", error);
+      }
+    }
+
+    // The budget could not be checked, or the model failed: answer for free.
+    return respond(keywordAnswer(message, prompts));
+  } catch (error) {
+    console.error("[chat] เกิดข้อผิดพลาดในการประมวลผลคำตอบ:", error);
+    return respond({
+      reply: "สวัสดีครับ! ขณะนี้ระบบ AI กำลังเตรียมความพร้อม คุณสามารถค้นหา Prompt ได้จากแถบค้นหาด้านบนของเว็บได้เลยครับ",
+      prompts: [],
+    });
+  }
 }
