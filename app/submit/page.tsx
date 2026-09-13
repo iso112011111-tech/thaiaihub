@@ -9,7 +9,7 @@ export default function SubmitPage() {
       <header>
         <h1 className="text-xl font-bold tracking-tight text-ink">ส่ง Prompt</h1>
         <p className="mt-1 text-sm text-ink-muted">
-          แชร์สูตรสั่ง AI ของคุณให้ชุมชนได้ใช้งาน ทีมงานจะตรวจสอบก่อนเผยแพร่
+          แชร์สูตรสั่ง AI ของคุณให้ชุมชนได้ใช้งาน เผยแพร่ทันทีหลังส่ง
         </p>
       </header>
 

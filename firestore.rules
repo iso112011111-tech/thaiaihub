@@ -33,7 +33,9 @@ service cloud.firestore {
     }
 
     function validCategory(value) {
-      return value in ['chatgpt', 'midjourney', 'image', 'agent', 'marketing', 'video', 'code', 'other'];
+      // Keep in step with the category ids in lib/constants.ts.
+      return value in ['chatgpt', 'midjourney', 'image', 'video', 'audio', 'writing', 'marketing',
+                       'business', 'education', 'data', 'language', 'code', 'agent', 'other'];
     }
 
     function validPromptContent(data) {

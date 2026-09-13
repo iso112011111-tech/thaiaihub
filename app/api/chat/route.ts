@@ -316,14 +316,22 @@ async function modelAnswer(
 // ---------------------------------------------------------------------------
 
 // Everyday words people use for a category, beyond its chip label.
+// Checked in this order and the first match wins, so specific categories come
+// before broad ones: "เขียนโค้ด" is code, not writing.
 const CATEGORY_SYNONYMS: Record<string, string[]> = {
   chatgpt: ["chatgpt", "แชท", "gpt"],
   midjourney: ["midjourney", "มิดเจอร์นีย์"],
-  image: ["วาด", "ภาพ", "รูป", "image", "ghibli"],
+  code: ["โค้ด", "code", "เว็บไซต์", "โปรแกรม", "html", "css", "javascript", "python"],
   agent: ["เอเจนต์", "agent", "บอท"],
-  marketing: ["การตลาด", "ตลาด", "คอนเทนต์", "โฆษณา", "seo", "ขาย"],
+  data: ["วิเคราะห์ข้อมูล", "ข้อมูล", "data", "กราฟ", "สถิติ", "sql", "excel"],
+  language: ["แปล", "translate", "ภาษาอังกฤษ", "ไวยากรณ์", "grammar"],
+  audio: ["เสียง", "เพลง", "พากย์", "พอดแคสต์", "podcast", "suno"],
   video: ["วิดีโอ", "คลิป", "video", "สคริปต์"],
-  code: ["โค้ด", "code", "เว็บไซต์", "โปรแกรม", "html", "css", "javascript"],
+  image: ["วาด", "ภาพ", "รูป", "image", "ghibli"],
+  marketing: ["การตลาด", "ตลาด", "คอนเทนต์", "โฆษณา", "seo", "ขาย"],
+  business: ["ธุรกิจ", "อีเมล", "รายงาน", "ประชุม", "งานออฟฟิศ", "สมัครงาน", "เรซูเม่"],
+  education: ["เรียน", "สอน", "การบ้าน", "ข้อสอบ", "ติว", "นักเรียน", "ครู"],
+  writing: ["เขียน", "บทความ", "แคปชั่น", "เรียงความ", "นิยาย", "กลอน"],
 };
 
 const POPULAR_WORDS = ["ยอดนิยม", "นิยม", "ฮิต", "popular", "แนะนำ"];

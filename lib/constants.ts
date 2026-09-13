@@ -1,11 +1,17 @@
 import {
   Bot,
+  Briefcase,
+  ChartColumn,
   Code2,
+  GraduationCap,
   Image as ImageIcon,
+  Languages,
   Layers,
   Megaphone,
   MessageSquare,
+  Music,
   Palette,
+  PenLine,
   Sparkles,
   Video,
   type LucideIcon,
@@ -15,16 +21,26 @@ import type { Category, CategoryId } from "@/types";
 export const SITE_NAME = "Thai AI Hub";
 export const SITE_TAGLINE = "รวมสุดยอด AI ไว้ที่เดียว";
 
-/** Filter chips under the hero search field. Order is the display order. */
+/**
+ * Filter chips under the hero search field and the submit form's choices.
+ * Order is the display order. Adding an id also needs types/index.ts,
+ * categoryIcons below and validCategory in firestore.rules.
+ */
 export const categories: Category[] = [
   { id: "all", label: "ทั้งหมด" },
   { id: "chatgpt", label: "ChatGPT" },
   { id: "midjourney", label: "Midjourney" },
   { id: "image", label: "วาดภาพ" },
-  { id: "agent", label: "สร้างตอบเอเจนต์" },
-  { id: "marketing", label: "การตลาด" },
   { id: "video", label: "วิดีโอ" },
+  { id: "audio", label: "เสียงและเพลง" },
+  { id: "writing", label: "งานเขียน" },
+  { id: "marketing", label: "การตลาด" },
+  { id: "business", label: "ธุรกิจและงานออฟฟิศ" },
+  { id: "education", label: "การศึกษา" },
+  { id: "data", label: "วิเคราะห์ข้อมูล" },
+  { id: "language", label: "ภาษาและการแปล" },
   { id: "code", label: "โค้ด/โปรแกรม" },
+  { id: "agent", label: "เอเจนต์ AI" },
   { id: "other", label: "อื่นๆ" },
 ];
 
@@ -33,10 +49,16 @@ export const categoryIcons: Record<Exclude<CategoryId, "all">, LucideIcon> = {
   chatgpt: MessageSquare,
   midjourney: Sparkles,
   image: Palette,
-  agent: Bot,
-  marketing: Megaphone,
   video: Video,
+  audio: Music,
+  writing: PenLine,
+  marketing: Megaphone,
+  business: Briefcase,
+  education: GraduationCap,
+  data: ChartColumn,
+  language: Languages,
   code: Code2,
+  agent: Bot,
   other: ImageIcon,
 };
 

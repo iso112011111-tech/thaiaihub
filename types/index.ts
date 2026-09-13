@@ -3,10 +3,16 @@ export type CategoryId =
   | "chatgpt"
   | "midjourney"
   | "image"
-  | "agent"
-  | "marketing"
   | "video"
+  | "audio"
+  | "writing"
+  | "marketing"
+  | "business"
+  | "education"
+  | "data"
+  | "language"
   | "code"
+  | "agent"
   | "other";
 
 export interface Category {
